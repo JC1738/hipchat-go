@@ -25,7 +25,7 @@ func main() {
 		return
 	}
 	c := hipchat.NewClient(*token)
-	hist, resp, err := c.Room.History(*roomId, &hipchat.HistoryRequest{})
+	hist, resp, err := c.Room.History(*roomId, &hipchat.HistoryOptions{})
 	if err != nil {
 		fmt.Printf("Error during room history req %q\n", err)
 		fmt.Printf("Server returns %+v\n", resp)
@@ -42,7 +42,7 @@ func main() {
 		}
 		msg := m.Message
 		if len(m.Message) > (maxMsgLen - len(moreString)) {
-			msg = fmt.Sprintf("%s%s", strings.Replace(m.Message[:maxMsgLen], "\n", " - ", -1), moreString)
+			msg = fmt.Sprintf("%s%s", strings.Replace(m.Message[:len(m.Message)], "\n", " - ", -1), moreString)
 		}
 		fmt.Printf("%s [%s]: %s\n", from, m.Date, msg)
 	}

@@ -30,9 +30,7 @@ func TestUserShareFile(t *testing.T) {
 		"--hipfileboundary\n"
 
 	mux.HandleFunc("/user/1/share/file", func(w http.ResponseWriter, r *http.Request) {
-		if m := "POST"; m != r.Method {
-			t.Errorf("Request method %s, want %s", r.Method, m)
-		}
+		testMethod(t, r, "POST")
 
 		body, _ := ioutil.ReadAll(r.Body)
 
@@ -56,9 +54,7 @@ func TestUserMessage(t *testing.T) {
 	args := &MessageRequest{Message: "m", MessageFormat: "text"}
 
 	mux.HandleFunc("/user/@FirstL/message", func(w http.ResponseWriter, r *http.Request) {
-		if m := "POST"; m != r.Method {
-			t.Errorf("Request method %s, want %s", r.Method, m)
-		}
+		testMethod(t, r, "POST")
 		v := new(MessageRequest)
 		json.NewDecoder(r.Body).Decode(v)
 
@@ -79,9 +75,7 @@ func TestUserView(t *testing.T) {
 	defer teardown()
 
 	mux.HandleFunc("/user/@FirstL", func(w http.ResponseWriter, r *http.Request) {
-		if m := "GET"; m != r.Method {
-			t.Errorf("Request method %s, want %s", r.Method, m)
-		}
+		testMethod(t, r, "GET")
 		fmt.Fprintf(w, `
 			{
 				"created": "2013-11-07T17:57:11+00:00",
@@ -117,7 +111,7 @@ func TestUserView(t *testing.T) {
 				"xmpp_jid": "1@chat.hipchat.com"
 			}`)
 	})
-	want := &User{XmppJid: "1@chat.hipchat.com",
+	want := &User{XMPPJid: "1@chat.hipchat.com",
 		IsDeleted:    false,
 		Name:         "First Last",
 		LastActive:   "1421029691",
@@ -130,7 +124,7 @@ func TestUserView(t *testing.T) {
 		Timezone:     "America/New_York",
 		IsGuest:      false,
 		Email:        "user@example.com",
-		PhotoUrl:     "https://bitbucket-assetroot.s3.amazonaws.com/c/photos/2014/Mar/02/hipchat-pidgin-theme-logo-571708621-0_avatar.png",
+		PhotoURL:     "https://bitbucket-assetroot.s3.amazonaws.com/c/photos/2014/Mar/02/hipchat-pidgin-theme-logo-571708621-0_avatar.png",
 		Links:        Links{Self: "https://api.hipchat.com/v2/user/1"}}
 
 	user, _, err := client.User.View("@FirstL")
@@ -147,9 +141,14 @@ func TestUserList(t *testing.T) {
 	defer teardown()
 
 	mux.HandleFunc("/user", func(w http.ResponseWriter, r *http.Request) {
-		if m := "GET"; m != r.Method {
-			t.Errorf("Request method %s, want %s", r.Method, m)
-		}
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"start-index":     "1",
+			"max-results":     "100",
+			"expand":          "expansion",
+			"include-guests":  "true",
+			"include-deleted": "true",
+		})
 		fmt.Fprintf(w, `
             {
               "items": [
@@ -178,11 +177,40 @@ func TestUserList(t *testing.T) {
 		},
 	}
 
-	users, _, err := client.User.List(0, 100, false, false)
+	opt := &UserListOptions{
+		ListOptions{StartIndex: 1, MaxResults: 100},
+		ExpandOptions{"expansion"},
+		true, true,
+	}
+
+	users, _, err := client.User.List(opt)
 	if err != nil {
 		t.Fatalf("User.List returned an error %v", err)
 	}
 	if !reflect.DeepEqual(want, users) {
 		t.Errorf("User.List returned %+v, want %+v", users, want)
+	}
+}
+
+func TestUserUpdate(t *testing.T) {
+	setup()
+	defer teardown()
+
+	pArgs := UpdateUserPresenceRequest{Status: "status", Show: UserPresenceShowDnd}
+	userArgs := &UpdateUserRequest{Name: "n", Presence: pArgs, MentionName: "mn", Email: "e"}
+
+	mux.HandleFunc("/user/@FirstL", func(w http.ResponseWriter, r *http.Request) {
+		testMethod(t, r, "PUT")
+		v := new(UpdateUserRequest)
+		json.NewDecoder(r.Body).Decode(v)
+
+		if !reflect.DeepEqual(v, userArgs) {
+			t.Errorf("Request body %+v, want %+v", v, userArgs)
+		}
+	})
+
+	_, err := client.User.Update("@FirstL", userArgs)
+	if err != nil {
+		t.Fatalf("User.Update returns an error %v", err)
 	}
 }

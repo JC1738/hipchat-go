@@ -13,14 +13,16 @@ func TestWebhookList(t *testing.T) {
 	defer teardown()
 
 	mux.HandleFunc("/room/1/webhook", func(w http.ResponseWriter, r *http.Request) {
-		if m := "GET"; m != r.Method {
-			t.Errorf("Request method = %v, want %v", r.Method, m)
-		}
+		testMethod(t, r, "GET")
+		testFormValues(t, r, values{
+			"max-results": "100",
+			"start-index": "1",
+		})
 		fmt.Fprintf(w, `
 		{
 			"items":[
-			  {"name":"a", "pattern":"a", "event":"message_received", "url":"h", "id":1, "links":{"self":"s"}},
-				{"name":"b", "pattern":"b", "event":"message_received", "url":"h", "id":2, "links":{"self":"s"}}
+			  {"name":"a", "key": "a", "pattern":"a", "event":"message_received", "url":"h", "id":1, "links":{"self":"s"}},
+				{"name":"b", "key": "b", "pattern":"b", "event":"message_received", "url":"h", "id":2, "links":{"self":"s"}}
 			],
 			"links":{"self":"s", "prev":"a", "next":"b"},
 			"startIndex":0,
@@ -30,21 +32,23 @@ func TestWebhookList(t *testing.T) {
 
 	want := &WebhookList{
 		Webhooks: []Webhook{
-			Webhook{
-				Name:         "a",
-				Pattern:      "a",
-				Event:        "message_received",
-				URL:          "h",
-				ID:           1,
-				WebhookLinks: WebhookLinks{Links: Links{Self: "s"}},
+			{
+				Name:    "a",
+				Key:     "a",
+				Pattern: "a",
+				Event:   "message_received",
+				URL:     "h",
+				ID:      1,
+				Links:   Links{Self: "s"},
 			},
-			Webhook{
-				Name:         "b",
-				Pattern:      "b",
-				Event:        "message_received",
-				URL:          "h",
-				ID:           2,
-				WebhookLinks: WebhookLinks{Links: Links{Self: "s"}},
+			{
+				Name:    "b",
+				Key:     "b",
+				Pattern: "b",
+				Event:   "message_received",
+				URL:     "h",
+				ID:      2,
+				Links:   Links{Self: "s"},
 			},
 		},
 		StartIndex: 0,
@@ -52,9 +56,9 @@ func TestWebhookList(t *testing.T) {
 		Links:      PageLinks{Links: Links{Self: "s"}, Prev: "a", Next: "b"},
 	}
 
-	reqParams := &ListWebhooksRequest{}
+	opt := &ListWebhooksOptions{ListOptions{1, 100}}
 
-	actual, _, err := client.Room.ListWebhooks("1", reqParams)
+	actual, _, err := client.Room.ListWebhooks("1", opt)
 	if err != nil {
 		t.Fatalf("Room.ListWebhooks returns an error %v", err)
 	}
@@ -68,9 +72,7 @@ func TestWebhookDelete(t *testing.T) {
 	defer teardown()
 
 	mux.HandleFunc("/room/1/webhook/2", func(w http.ResponseWriter, r *http.Request) {
-		if m := "DELETE"; m != r.Method {
-			t.Errorf("Request method %s, want %s", r.Method, m)
-		}
+		testMethod(t, r, "DELETE")
 	})
 
 	_, err := client.Room.DeleteWebhook("1", "2")

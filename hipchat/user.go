@@ -20,9 +20,37 @@ type UserPresence struct {
 	IsOnline bool   `json:"is_online"`
 }
 
+const (
+	// UserPresenceShowAway show status away
+	UserPresenceShowAway = "away"
+
+	// UserPresenceShowChat show status available to chat
+	UserPresenceShowChat = "chat"
+
+	// UserPresenceShowDnd show status do not disturb
+	UserPresenceShowDnd = "dnd"
+
+	// UserPresenceShowXa show status xa?
+	UserPresenceShowXa = "xa"
+)
+
+// UpdateUserRequest represents a HipChat user update request body.
+type UpdateUserRequest struct {
+	Name        string                    `json:"name"`
+	Presence    UpdateUserPresenceRequest `json:"presence"`
+	MentionName string                    `json:"mention_name"`
+	Email       string                    `json:"email"`
+}
+
+// UpdateUserPresenceRequest represents the HipChat user's presence update request body.
+type UpdateUserPresenceRequest struct {
+	Status string `json:"status"`
+	Show   string `json:"show"`
+}
+
 // User represents the HipChat user.
 type User struct {
-	XmppJid      string       `json:"xmpp_jid"`
+	XMPPJid      string       `json:"xmpp_jid"`
 	IsDeleted    bool         `json:"is_deleted"`
 	Name         string       `json:"name"`
 	LastActive   string       `json:"last_active"`
@@ -35,7 +63,7 @@ type User struct {
 	Timezone     string       `json:"timezone"`
 	IsGuest      bool         `json:"is_guest"`
 	Email        string       `json:"email"`
-	PhotoUrl     string       `json:"photo_url"`
+	PhotoURL     string       `json:"photo_url"`
 	Links        Links        `json:"links"`
 }
 
@@ -68,7 +96,7 @@ func (u *UserService) ShareFile(id string, shareFileReq *ShareFileRequest) (*htt
 //
 // HipChat API docs: https://www.hipchat.com/docs/apiv2/method/view_user
 func (u *UserService) View(id string) (*User, *http.Response, error) {
-	req, err := u.client.NewRequest("GET", fmt.Sprintf("user/%s", id), nil)
+	req, err := u.client.NewRequest("GET", fmt.Sprintf("user/%s", id), nil, nil)
 
 	userDetails := new(User)
 	resp, err := u.client.Do(req, &userDetails)
@@ -81,23 +109,30 @@ func (u *UserService) View(id string) (*User, *http.Response, error) {
 // Message sends a private message to the user specified by the id.
 //
 // HipChat API docs: https://www.hipchat.com/docs/apiv2/method/private_message_user
-func (r *UserService) Message(id string, msgReq *MessageRequest) (*http.Response, error) {
-	req, err := r.client.NewRequest("POST", fmt.Sprintf("user/%s/message", id), msgReq)
+func (u *UserService) Message(id string, msgReq *MessageRequest) (*http.Response, error) {
+	req, err := u.client.NewRequest("POST", fmt.Sprintf("user/%s/message", id), nil, msgReq)
 	if err != nil {
 		return nil, err
 	}
 
-	return r.client.Do(req, nil)
+	return u.client.Do(req, nil)
+}
+
+// UserListOptions specified the parameters to the UserService.List method.
+type UserListOptions struct {
+	ListOptions
+	ExpandOptions
+	// Include active guest users in response.
+	IncludeGuests bool `url:"include-guests,omitempty"`
+	// Include deleted users in response.
+	IncludeDeleted bool `url:"include-deleted,omitempty"`
 }
 
 // List returns all users in the group.
 //
 // HipChat API docs: https://www.hipchat.com/docs/apiv2/method/get_all_users
-func (u *UserService) List(start, max int, guests, deleted bool) ([]User, *http.Response, error) {
-	if max == 0 {
-		max = 100
-	}
-	req, err := u.client.NewRequest("GET", fmt.Sprintf("user?start-index=%d&max-results=%d&include-guests=%v&include-deleted=%v", start, max, guests, deleted), nil)
+func (u *UserService) List(opt *UserListOptions) ([]User, *http.Response, error) {
+	req, err := u.client.NewRequest("GET", "user", opt, nil)
 
 	users := new(Users)
 	resp, err := u.client.Do(req, &users)
@@ -105,4 +140,16 @@ func (u *UserService) List(start, max int, guests, deleted bool) ([]User, *http.
 		return nil, resp, err
 	}
 	return users.Items, resp, nil
+}
+
+// Update a user
+//
+// HipChat API docs: https://www.hipchat.com/docs/apiv2/method/update_user
+func (u *UserService) Update(id string, user *UpdateUserRequest) (*http.Response, error) {
+	req, err := u.client.NewRequest("PUT", fmt.Sprintf("user/%s", id), nil, user)
+	if err != nil {
+		return nil, err
+	}
+
+	return u.client.Do(req, nil)
 }
